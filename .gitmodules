@@ -1,0 +1,15 @@
+[submodule "extern/corrade"]
+	path = extern/corrade
+	url = https://github.com/mosra/corrade.git
+[submodule "extern/magnum"]
+	path = extern/magnum
+	url = https://github.com/mosra/magnum.git
+[submodule "extern/glfw"]
+	path = extern/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "extern/magnum-integration"]
+	path = extern/magnum-integration
+	url = https://github.com/mosra/magnum-integration.git
+[submodule "extern/imgui"]
+	path = extern/imgui
+	url = https://github.com/ocornut/imgui.git
