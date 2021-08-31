@@ -50,7 +50,7 @@ class ParticleSphereShader: public GL::AbstractShaderProgram {
         ParticleSphereShader& setPointSizeScale(Float scale);
         ParticleSphereShader& setColorMode(Int colorMode);
         ParticleSphereShader& setAmbientColor(const Color3& color);
-        ParticleSphereShader& setDiffuseColor(const Color3& color);
+        //ParticleSphereShader& setDiffuseColor(const Color3& color);
         ParticleSphereShader& setSpecularColor(const Color3& color);
         ParticleSphereShader& setShininess(Float shininess);
 
@@ -65,7 +65,7 @@ class ParticleSphereShader: public GL::AbstractShaderProgram {
             _uPointSizeScale,
             _uColorMode,
             _uAmbientColor,
-            _uDiffuseColor,
+            //_uDiffuseColor,
             _uSpecularColor,
             _uShininess,
             _uViewMatrix,

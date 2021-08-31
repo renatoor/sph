@@ -7,6 +7,7 @@ SPH::SPH(Float particleRadius, size_t n) :
     _velocities(n, {0.0f, 0.0f, 0.0f}),
     _densities(n, 0.0f),
     _densityCorrections(n, 0.0f),
+    _temperatures(n, 0.0f),
     _f(n, {0.0f, 0.0f, 0.0f}),
     _particleRadius(particleRadius),
     _particleRadiusSqr(particleRadius * particleRadius),
@@ -19,21 +20,22 @@ SPH::SPH(Float particleRadius, size_t n) :
 void SPH::addParticle(Vector3 position, Vector3 initialVelocity)
 {
     if (_numParticles < _maxParticles) {
-        _positions.push_back(position);
+        _particleVertex.push_back({position, 0x00ff00_rgbf});
         _velocities[_numParticles] = initialVelocity;
+        _temperatures[_numParticles] = 25.0f;
         _numParticles++;
     }
 }
 
 void SPH::computeUncorrectedDensities()
 {
-    for (size_t i = 0; i < _positions.size(); i++) {
+    for (size_t i = 0; i < _particleVertex.size(); i++) {
         _densities[i] = _kernels.W0();
 
-        for (size_t j = 0; j < _positions.size(); j++) {
+        for (size_t j = 0; j < _particleVertex.size(); j++) {
             if (i == j) continue;
 
-            Vector3 diff = _positions[i] - _positions[j];
+            Vector3 diff = _particleVertex[i].position - _particleVertex[j].position;
 
             Float r = diff.length();
 
@@ -46,13 +48,13 @@ void SPH::computeUncorrectedDensities()
 
 void SPH::computeDensities()
 {
-    for (size_t i = 0; i < _positions.size(); i++) {
+    for (size_t i = 0; i < _particleVertex.size(); i++) {
         Vector3 aux (0.0f, 0.0f, 0.0f);
 
-        for (size_t j = 0; j < _positions.size(); j++) {
+        for (size_t j = 0; j < _particleVertex.size(); j++) {
             if (i == j) continue;
 
-            Vector3 diff = _positions[i] - _positions[j];
+            Vector3 diff = _particleVertex[i].position - _particleVertex[j].position;
 
             Float r = diff.length();
 
@@ -69,47 +71,62 @@ void SPH::computeDensities()
 
 void SPH::computeForces()
 {
-    for (size_t i = 0; i < _positions.size(); i++) {
+    for (size_t i = 0; i < _particleVertex.size(); i++) {
+        Vector3 damping {0.0f, 0.0f, 0.0f};
+        Vector3 buoyancy {0.0f, 0.0f, 0.0f};
+
         Vector3 fAtmosfericPressure {0.0f, 0.0f, 0.0f};
         Vector3 fPressure {0.0f, 0.0f, 0.0f};
         Vector3 fViscosity {0.0f, 0.0f, 0.0f};
-        //Vector3 fSurfaceTension {0.0f, 0.0f, 0.0f};
 
-        //int count = 0;
-        //Vector3 surfaceTensionGrad {0.0f, 0.0f, 0.0f};
-        //Float surfaceTensionLapl = 0.0f;
-
-        for (size_t j = 0; j < _positions.size(); j++) {
+        Float dTemperature = 0.0f;
+        
+        for (size_t j = 0; j < _particleVertex.size(); j++) {
             if (i == j) continue;
 
             Float pi = computePressure(_densities[i]);
             Float pj = computePressure(_densities[j]);
             Float pk = computePressure(_densityCorrections[i]);
-            //Float pj = computePressure(_densityCorrections[j]);
 
-            Vector3 diff = _positions[i] - _positions[j];
+            Vector3 diff = _particleVertex[i].position - _particleVertex[j].position;
 
             Float r = diff.dot();
-            if (r > 0.0f)
-                fAtmosfericPressure += _particleMass / pj * _kernels.spikyGradW(diff);
 
             if (r > 0.0f && r <= _particleRadiusSqr) {
-                fPressure -= _particleMass * (pi + pj) / (2.0f * _densities[j]) * _kernels.spikyGradW(diff)
-                    + _particleMass * (pi + pk) / (2.0f * _densityCorrections[i]) * _kernels.spikyGradW(virtualParticle);
+                fAtmosfericPressure += (_particleMass / pj) * _kernels.spikyGradW(diff);
+
+                fPressure -= (_particleMass / _densities[j]) * ((pi + pj) / 2.0f) * _kernels.spikyGradW(diff)
+                    + (_particleMass / _densityCorrections[i]) * ((pi + pk) / 2.0f) * _kernels.spikyGradW(virtualParticle);
+
                 fViscosity += _particleMass * (_velocities[j] - _velocities[i]) / _densities[j] * _kernels.laplW(diff);
-                //surfaceTensionGrad += _kernels.poly6GradW(diff) / _densities[j];
-                //surfaceTensionLapl += _kernels.poly6LaplW(diff) / _densities[j];
-                //count++;
+
+                dTemperature += (_particleMass / (pi * pj)) * _thermalConductivity * (_temperatures[i] - _temperatures[j])
+                    * ((dot(diff, _kernels.spikyGradW(diff))) / (diff.dot() * _smallPositive));
             }
         }
 
-        //if (surfaceTensionGrad.length() >= Math::sqrt(_restDensity / count)) {
-        //    fSurfaceTension = -surfaceTensionGrad / surfaceTensionGrad.length() * surfaceTensionLapl * _surfaceTension;
-        //}
-
         fViscosity *= _particleViscosity;
-        //_f[i] = fPressure + fViscosity + _densities[i] * _gravity;// + fSurfaceTension;
-        _f[i] = (fPressure + 100.0f * fAtmosfericPressure) / _densities[i] + fViscosity / _densities[i] * _gravity;// + fSurfaceTension;
+
+        if (fAtmosfericPressure.length() > _dampingThreshold) {
+            //_temperatures[i] = dTemperature * _radiationHalfLife * -1.0f;
+            dTemperature -= _temperatures[i] / _radiationHalfLife;
+            damping = -_dampingCoefficient * _velocities[i];
+        }
+
+        _temperatures[i] += dTemperature;
+        //std::cout << "d temp " << dTemperature << std::endl;
+
+        //if (isnan(dTemperature)) exit(0);
+        //std::cout << "temp " << _temperatures[i] << std::endl;
+
+        //buoyancy = _buoyancyCoefficient * _temperatures[i] * _buoyancyDirection;
+        buoyancy = _buoyancyCoefficient * 50.0f * _buoyancyDirection;
+
+        //std::cout << buoyancy[0] << " " << buoyancy[1] << " " << buoyancy[2] << std::endl;
+
+        _f[i] = (fPressure + 1.0f * fAtmosfericPressure) + fViscosity + _densities[i] * (_gravity);// +  buoyancy);
+
+        //std::cout << _f[0] << " " << _f[1] << " " << _f[2] << std::endl;
     }
 }
 
@@ -120,25 +137,25 @@ Float SPH::computePressure(Float density)
 
 void SPH::integrate(Float timestep)
 {
-    timestep = 0.01;
+    timestep = 0.001;
 
-    for (size_t i = 0; i < _positions.size(); i++) {
+    for (size_t i = 0; i < _particleVertex.size(); i++) {
         Vector3 prevAccel = _accelerations[i];
         Vector3 prevVel = _velocities[i];
 
         //_accelerations[i] = _f[i] / _densities[i];
-        //Vector3 position = _positions[i] + _velocities[i] * timestep + _accelerations[i] * timestep * timestep;
-        //Vector3 velocity = (position - _positions[i]) / timestep;
+        //Vector3 position = _particleVertex[i].position + _velocities[i] * timestep + _accelerations[i] * timestep * timestep;
+        //Vector3 velocity = (position - _particleVertex[i].position) / timestep;
         //_velocities[i] = velocity;
-        //_positions[i] = position;
+        //_particleVertex[i].position = position;
 
         _accelerations[i] = _f[i] / _densities[i];
         _velocities[i] += (prevAccel + _accelerations[i]) / 2.0 * timestep;
-        _positions[i] += prevVel * timestep + prevAccel / 2.0 * timestep * timestep;
+        _particleVertex[i].position += prevVel * timestep + prevAccel / 2.0 * timestep * timestep;
 
         //_accelerations[i] = _f[i] / _densities[i];
         //_velocities[i] += _accelerations[i] * timestep;
-        //_positions[i] += _velocities[i] * timestep;
+        //_particleVertex[i].position += _velocities[i] * timestep;
 
         checkCollisions(i);
     }
@@ -146,18 +163,17 @@ void SPH::integrate(Float timestep)
 
 void SPH::checkCollisions(size_t i)
 {
-    Vector3 position = _positions[i];
+    Vector3 position = _particleVertex[i].position;
     Vector3 velocity = _velocities[i];
     Float r = _particleRadius;
 
-    Float force = -0.3f;
+    Float force = -0.1f;
 
     if (position[0] > 1.0f - r)
     {
         position[0] = 1.0f - r;
         velocity[0] *= force;
     }
-
     if (position[0] < r)
     {
         position[0] = r;
@@ -188,7 +204,13 @@ void SPH::checkCollisions(size_t i)
         velocity[2] *= force;
     }
 
-    _positions[i] = position;
+    _particleVertex[i].position = position;
+    if (i % 2 == 0) {
+        _particleVertex[i].color = 0x0000ff_rgbf;
+    }
+    else {
+        _particleVertex[i].color = 0x00ff00_rgbf;
+    }
     _velocities[i] = velocity;
 }
 

@@ -38,12 +38,14 @@
 #include <Magnum/SceneGraph/Camera.h>
 
 #include "Shaders/ParticleSphereShader.h"
+#include "Objects/ParticleVertex.h"
 
 namespace Magnum { namespace Examples {
 
 class ParticleGroup {
     public:
-        explicit ParticleGroup(const std::vector<Vector3>& points, float particleRadius);
+        //explicit ParticleGroup(const std::vector<Vector3>& points, float particleRadius);
+        explicit ParticleGroup(const std::vector<ParticleVertex>& particleVertex, float particleRadius);
 
         //ParticleGroup& draw(Containers::Pointer<SceneGraph::Camera3D>& camera, const Vector2i& viewportSize);
         ParticleGroup& draw(SceneGraph::Camera3D& camera, const Vector2i& viewportSize);
@@ -105,7 +107,8 @@ class ParticleGroup {
         }
 
     private:
-        const std::vector<Vector3>& _points;
+        //const std::vector<Vector3>& _points;
+        const std::vector<ParticleVertex>& _particleVertex;
         bool _dirty = false;
 
         Float _particleRadius = 1.0f;

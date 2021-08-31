@@ -86,7 +86,7 @@ MainApplication::MainApplication(const Arguments& arguments) :
     float inc = 0.04f;
 
     for (float x = 0.75f - 0.04f; x >= 1.0f - max; x -= inc) {
-        for (float y = 0.1f; y <= 0.5f; y += inc) {
+        for (float y = 0.1f; y <= 0.8f; y += inc) {
             for (float z = 0.4; z < 0.6f; z += inc) {
                 float jitter = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
                 jitter /= 1000.0f;
@@ -118,7 +118,8 @@ MainApplication::MainApplication(const Arguments& arguments) :
     _box->transform(Matrix4::scaling(Vector3{ 0.5, 0.5, 0.5 }) * Matrix4::translation(Vector3(1)));
     _box->setColor(Color3(1, 1, 0));
 
-    _drawableParticles.reset(new ParticleGroup{_sph->particlePositions(), ParticleRadius});
+    //_drawableParticles.reset(new ParticleGroup{_sph->particlePositions(), ParticleRadius});
+    _drawableParticles.reset(new ParticleGroup{_sph->particleVertex(), ParticleRadius});
     _drawableParticles->setDirty();
 
     _drawableParticles->setColorMode(ParticleSphereShader::ColorMode(0));
@@ -135,7 +136,7 @@ MainApplication::MainApplication(const Arguments& arguments) :
 void MainApplication::drawEvent() {
     Float deltaTs = _timeline.previousFrameDuration();
 
-    if (count < 1000) {
+    if (count < 3000) {
         float jitter = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) / 5.f;
         float jitter2 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) / 5.f;
         //_sph->addParticle(Vector3(1.0f, 0.8f + jitter, 0.5f + jitter), Vector3(3.0f + jitter2, 1.0f, jitter));

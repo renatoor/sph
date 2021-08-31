@@ -36,9 +36,10 @@ uniform int colorMode;
 uniform float particleRadius;
 uniform float pointSizeScale;
 
-uniform vec3 diffuseColor;
+//uniform vec3 diffuseColor;
 
 layout(location = 0) in highp vec3 position;
+layout(location = 2) in highp vec3 diffuseColor;
 
 flat out vec3 viewCenter;
 flat out vec3 color;

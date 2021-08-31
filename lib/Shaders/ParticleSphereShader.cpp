@@ -57,7 +57,7 @@ ParticleSphereShader::ParticleSphereShader() {
     _uPointSizeScale = uniformLocation("pointSizeScale");
     _uColorMode = uniformLocation("colorMode");
     _uAmbientColor = uniformLocation("ambientColor");
-    _uDiffuseColor = uniformLocation("diffuseColor");
+    //_uDiffuseColor = uniformLocation("diffuseColor");
     _uSpecularColor = uniformLocation("specularColor");
     _uShininess = uniformLocation("shininess");
 
@@ -91,10 +91,12 @@ ParticleSphereShader& ParticleSphereShader::setAmbientColor(const Color3& color)
     return *this;
 }
 
+/*
 ParticleSphereShader& ParticleSphereShader::setDiffuseColor(const Color3& color) {
     setUniform(_uDiffuseColor, color);
     return *this;
 }
+*/
 
 ParticleSphereShader& ParticleSphereShader::setSpecularColor(const Color3& color) {
     setUniform(_uSpecularColor, color);

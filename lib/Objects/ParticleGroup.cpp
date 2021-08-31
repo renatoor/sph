@@ -42,35 +42,41 @@ namespace Magnum { namespace Examples {
 
 using namespace Math::Literals;
 
-ParticleGroup::ParticleGroup(const std::vector<Vector3>& points, float particleRadius):
-    _points(points),
+//ParticleGroup::ParticleGroup(const std::vector<Vector3>& points, float particleRadius):
+ParticleGroup::ParticleGroup(const std::vector<ParticleVertex>& particleVertex, float particleRadius):
+    //_points(points),
+    _particleVertex(particleVertex),
     _particleRadius(particleRadius),
     _meshParticles(GL::MeshPrimitive::Points) {
-    _meshParticles.addVertexBuffer(_bufferParticles, 0, Shaders::GenericGL3D::Position{});
+    _meshParticles.addVertexBuffer(_bufferParticles, 0, Shaders::GenericGL3D::Position{}, Shaders::GenericGL3D::Color3{});
     _particleShader.reset(new ParticleSphereShader);
 }
 
 //ParticleGroup& ParticleGroup::draw(Containers::Pointer<SceneGraph::Camera3D>& camera, const Vector2i& viewportSize) {
 ParticleGroup& ParticleGroup::draw(SceneGraph::Camera3D& camera, const Vector2i& viewportSize) {
-    if(_points.empty()) return *this;
+    //if(_points.empty()) return *this;
+    if(_particleVertex.empty()) return *this;
 
     if(_dirty) {
-        Containers::ArrayView<const float> data(reinterpret_cast<const float*>(&_points[0]), _points.size() * 3);
+        //Containers::ArrayView<const float> data(reinterpret_cast<const float*>(&_points[0]), _points.size() * 3);
+        Containers::ArrayView<const float> data(reinterpret_cast<const float*>(&_particleVertex[0]), _particleVertex.size() * 6);
         _bufferParticles.setData(data);
-        _meshParticles.setCount(static_cast<int>(_points.size()));
+        //_meshParticles.setCount(static_cast<int>(_points.size()));
+        _meshParticles.setCount(static_cast<int>(_particleVertex.size()));
         _dirty = false;
     }
 
     (*_particleShader)
         /* particle data */
-        .setNumParticles(static_cast<int>(_points.size()))
+        //.setNumParticles(static_cast<int>(_points.size()))
+        .setNumParticles(static_cast<int>(_particleVertex.size()))
         .setParticleRadius(_particleRadius)
         /* sphere render data */
         .setPointSizeScale(static_cast<float>(viewportSize.y())/
             Math::tan(22.5_degf)) /* tan(half field-of-view angle (45_deg)*/
         .setColorMode(_colorMode)
         .setAmbientColor(_ambientColor)
-        .setDiffuseColor(_diffuseColor)
+        //.setDiffuseColor(_diffuseColor)
         .setSpecularColor(_specularColor)
         .setShininess(_shininess)
         /* view/prj matrices and light */
