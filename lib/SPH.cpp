@@ -1,6 +1,18 @@
 #include "SPH.h"
 
+#include <algorithm>
+
 namespace Magnum {
+
+float maxTemp = 0.0f;
+
+Color3 SPH::temperatureToColor(float temp, float min, float max) {
+    float val = max - min;
+    float temp0 = temp - min;
+    float deg = (temp0 / val) * 360.0f;
+
+    return Color3::fromHsv(ColorHsv(Deg(deg), 0.7f, 0.5f));
+}
 
 SPH::SPH(Float particleRadius, size_t n) :
     _accelerations(n, {0.0f, 0.0f, 0.0f}),
@@ -8,21 +20,20 @@ SPH::SPH(Float particleRadius, size_t n) :
     _densities(n, 0.0f),
     _densityCorrections(n, 0.0f),
     _temperatures(n, 0.0f),
+    _dTemp(n, 0.0f),
     _f(n, {0.0f, 0.0f, 0.0f}),
     _particleRadius(particleRadius),
     _particleRadiusSqr(particleRadius * particleRadius),
-    _deltaParticleRadius(_delta * particleRadius),
-    _virtualDistance(_particleRadius * 0.4),
-    _virtualDistanceSqr(_virtualDistance * _virtualDistance),
     _kernels(_particleRadius),
     _maxParticles(n) {}
 
-void SPH::addParticle(Vector3 position, Vector3 initialVelocity)
+void SPH::addParticle(Vector3 position, Vector3 initialVelocity, float temperature)
 {
     if (_numParticles < _maxParticles) {
         _particleVertex.push_back({position, 0x00ff00_rgbf});
+        _virtualParticle.push_back({0.0f, _delta, 0.0f});
         _velocities[_numParticles] = initialVelocity;
-        _temperatures[_numParticles] = 25.0f;
+        _temperatures[_numParticles] = temperature;
         _numParticles++;
     }
 }
@@ -64,8 +75,8 @@ void SPH::computeDensities()
 
         }
 
-        Float v0 = aux.length() / _kernels.poly6GradW(virtualParticle).length();
-        _densityCorrections[i] = _densities[i] * (1.0f + v0 * _kernels.W(virtualParticle));
+        Float v0 = aux.length() / _kernels.poly6GradW(_virtualParticle[i]).length();
+        _densityCorrections[i] = _densities[i] * (1.0f + v0 * _kernels.W(_virtualParticle[i]));
     }
 }
 
@@ -80,7 +91,7 @@ void SPH::computeForces()
         Vector3 fViscosity {0.0f, 0.0f, 0.0f};
 
         Float dTemperature = 0.0f;
-        
+
         for (size_t j = 0; j < _particleVertex.size(); j++) {
             if (i == j) continue;
 
@@ -96,37 +107,27 @@ void SPH::computeForces()
                 fAtmosfericPressure += (_particleMass / pj) * _kernels.spikyGradW(diff);
 
                 fPressure -= (_particleMass / _densities[j]) * ((pi + pj) / 2.0f) * _kernels.spikyGradW(diff)
-                    + (_particleMass / _densityCorrections[i]) * ((pi + pk) / 2.0f) * _kernels.spikyGradW(virtualParticle);
+                    + (_particleMass / _densityCorrections[i]) * ((pi + pk) / 2.0f) * _kernels.spikyGradW(_virtualParticle[i]);
 
                 fViscosity += _particleMass * (_velocities[j] - _velocities[i]) / _densities[j] * _kernels.laplW(diff);
 
                 dTemperature += (_particleMass / (pi * pj)) * _thermalConductivity * (_temperatures[i] - _temperatures[j])
-                    * ((dot(diff, _kernels.spikyGradW(diff))) / (diff.dot() * _smallPositive));
+                    * (dot(diff, _kernels.spikyGradW(diff)) / (diff.dot() + _smallPositive));
             }
         }
 
         fViscosity *= _particleViscosity;
 
         if (fAtmosfericPressure.length() > _dampingThreshold) {
-            //_temperatures[i] = dTemperature * _radiationHalfLife * -1.0f;
-            dTemperature -= _temperatures[i] / _radiationHalfLife;
-            damping = -_dampingCoefficient * _velocities[i];
+          dTemperature -= _temperatures[i] / _radiationHalfLife;
+          damping = -_dampingCoefficient * _velocities[i];
         }
 
-        _temperatures[i] += dTemperature;
-        //std::cout << "d temp " << dTemperature << std::endl;
+        _dTemp[i] = dTemperature;
 
-        //if (isnan(dTemperature)) exit(0);
-        //std::cout << "temp " << _temperatures[i] << std::endl;
+        buoyancy = _buoyancyCoefficient * _temperatures[i] * _buoyancyDirection;
 
-        //buoyancy = _buoyancyCoefficient * _temperatures[i] * _buoyancyDirection;
-        buoyancy = _buoyancyCoefficient * 50.0f * _buoyancyDirection;
-
-        //std::cout << buoyancy[0] << " " << buoyancy[1] << " " << buoyancy[2] << std::endl;
-
-        _f[i] = (fPressure + 1.0f * fAtmosfericPressure) + fViscosity + _densities[i] * (_gravity);// +  buoyancy);
-
-        //std::cout << _f[0] << " " << _f[1] << " " << _f[2] << std::endl;
+        _f[i] = (fPressure + 1.0f * fAtmosfericPressure) + fViscosity + _densities[i] * (_gravity +  buoyancy + damping);
     }
 }
 
@@ -142,12 +143,18 @@ void SPH::integrate(Float timestep)
     for (size_t i = 0; i < _particleVertex.size(); i++) {
         Vector3 prevAccel = _accelerations[i];
         Vector3 prevVel = _velocities[i];
+        //float prevTemp = _temperatures[i];
+        //float newTemp = _temperatures[i] + _dTemp[i];
 
         //_accelerations[i] = _f[i] / _densities[i];
         //Vector3 position = _particleVertex[i].position + _velocities[i] * timestep + _accelerations[i] * timestep * timestep;
         //Vector3 velocity = (position - _particleVertex[i].position) / timestep;
         //_velocities[i] = velocity;
         //_particleVertex[i].position = position;
+
+        _temperatures[i] += _dTemp[i];// * timestep;
+        //std::cout << "temp[" << i << "] "; std::cout << _temperatures[i] << std::endl;
+        //_temperatures[i] += (prevTemp + newTemp) / 2.0 * timestep;
 
         _accelerations[i] = _f[i] / _densities[i];
         _velocities[i] += (prevAccel + _accelerations[i]) / 2.0 * timestep;
@@ -205,12 +212,17 @@ void SPH::checkCollisions(size_t i)
     }
 
     _particleVertex[i].position = position;
-    if (i % 2 == 0) {
+
+    /*
+    if (_temperatures[i] == 25.0f) {
         _particleVertex[i].color = 0x0000ff_rgbf;
     }
     else {
         _particleVertex[i].color = 0x00ff00_rgbf;
     }
+    */
+
+    _particleVertex[i].color = temperatureToColor(_temperatures[i], 00.0f, 40.0f);
     _velocities[i] = velocity;
 }
 

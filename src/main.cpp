@@ -136,11 +136,12 @@ MainApplication::MainApplication(const Arguments& arguments) :
 void MainApplication::drawEvent() {
     Float deltaTs = _timeline.previousFrameDuration();
 
-    if (count < 3000) {
+    if (count < 1500) {
         float jitter = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) / 5.f;
         float jitter2 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) / 5.f;
         //_sph->addParticle(Vector3(1.0f, 0.8f + jitter, 0.5f + jitter), Vector3(3.0f + jitter2, 1.0f, jitter));
-        _sph->addParticle(Vector3(0.5f + jitter, 0.04f, 0.5f + jitter2), Vector3(0.0f, 0.0f, 0.0f));
+        _sph->addParticle(Vector3(0.96f - jitter, 0.04f, 0.96f - jitter2), Vector3(-0.8f, 0.0f, -0.8f), 25.0f);
+        _sph->addParticle(Vector3(0.04f + jitter, 0.04f, 0.04f + jitter2), Vector3(1.0f, 0.0f, 1.0f), 35.0f);
         count++;
     }
 
