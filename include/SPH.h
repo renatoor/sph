@@ -26,6 +26,12 @@ public:
 
     void addParticle(Vector3 position, Vector3 initialVelocity, float temperature = 25.0f);
 
+    void showTemperature();
+    void showDensity();
+    void showVelocity();
+    void showAcceleration();
+    void showPosition();
+
 private:
 
     void computeUncorrectedDensities();
@@ -40,7 +46,9 @@ private:
 
     void checkCollisions(size_t idx);
 
-    Color3 temperatureToColor(float temp, float min, float max);
+    Color3 floatToColor(float temp, float min, float max);
+
+    Color3 positionToColor(Vector3 vec);
 
     //std::vector<Vector3> _positions; // _x
     std::vector<ParticleVertex> _particleVertex; // _x
@@ -88,6 +96,24 @@ private:
     Float _smallPositive = 0.0001;
 
     Vector3 _buoyancyDirection = Vector3(0.0f, 1.0f, 0.0f);
+
+    float _minTemp = 0.0f;
+    float _maxTemp = 0.0f;
+
+    float _minDensity = 0.0f;
+    float _maxDensity = 0.0f;
+
+    float _minVel = 0.0f;
+    float _maxVel = 0.0f;
+
+    float _minAcc = 0.0f;
+    float _maxAcc = 0.0f;
+
+    bool _showTemperature = false;
+    bool _showDensity = false;
+    bool _showVelocity = false;
+    bool _showAcceleration = false;
+    bool _showPosition = false;
 
 };
 

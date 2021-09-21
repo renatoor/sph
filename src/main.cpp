@@ -3,6 +3,7 @@
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/Platform/GlfwApplication.h>
 #include <Magnum/Timeline.h>
+#include <Magnum/ImGuiIntegration/Context.hpp>
 
 #include "Objects/ArcBall.h"
 #include "Objects/ArcBallCamera.h"
@@ -54,6 +55,14 @@ class MainApplication: public Platform::Application {
         SPH *_sph;
 
         Timeline _timeline;
+
+        ImGuiIntegration::Context _imgui{NoCreate};
+
+        bool _temperature = true;
+        bool _density = true;
+        bool _velocity = true;
+        bool _acceleration = true;
+        bool _position = true;
 };
 
 MainApplication::MainApplication(const Arguments& arguments) :
@@ -128,12 +137,25 @@ MainApplication::MainApplication(const Arguments& arguments) :
     GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
     GL::Renderer::enable(GL::Renderer::Feature::ProgramPointSize);
 
+    _imgui = ImGuiIntegration::Context(Vector2{windowSize()}/dpiScaling(),
+            windowSize(), framebufferSize());
+
+    /* Set up proper blending to be used by ImGui. There's a great chance
+       you'll need this exact behavior for the rest of your scene. If not, set
+       this only for the drawFrame() call. */
+    GL::Renderer::setBlendEquation(GL::Renderer::BlendEquation::Add,
+            GL::Renderer::BlendEquation::Add);
+    GL::Renderer::setBlendFunction(GL::Renderer::BlendFunction::SourceAlpha,
+            GL::Renderer::BlendFunction::OneMinusSourceAlpha);
+
     setSwapInterval(0);
 
     _timeline.start();
 }
 
 void MainApplication::drawEvent() {
+    GL::defaultFramebuffer.clear(GL::FramebufferClear::Color);
+
     Float deltaTs = _timeline.previousFrameDuration();
 
     if (count < 1500) {
@@ -160,6 +182,74 @@ void MainApplication::drawEvent() {
     //bool camChanged = _arcballCamera->update();
     _arcballCamera->update();
     _arcballCamera->draw(*_drawables);
+
+    _imgui.newFrame();
+
+    ImGui::Checkbox("Temperatura", &_temperature);
+
+    if (_temperature) {
+        _sph->showTemperature();
+        _density = false;
+        _velocity = false;
+        _acceleration = false;
+        _position = false;
+    }
+
+    ImGui::Checkbox("Densidade", &_density);
+
+    if (_density) {
+        _sph->showDensity();
+        _temperature = false;
+        _velocity = false;
+        _acceleration = false;
+        _position = false;
+    }
+
+    ImGui::Checkbox("Velocidade", &_velocity);
+
+    if (_velocity) {
+        _sph->showVelocity();
+        _temperature = false;
+        _density = false;
+        _acceleration = false;
+        _position = false;
+    }
+
+    ImGui::Checkbox("Aceleração", &_acceleration);
+
+    if (_acceleration) {
+        _sph->showAcceleration();
+        _temperature = false;
+        _density = false;
+        _velocity = false;
+        _position = false;
+    }
+
+    ImGui::Checkbox("Posição", &_position);
+
+    if (_position) {
+        _sph->showPosition();
+        _temperature = false;
+        _density = false;
+        _velocity = false;
+        _acceleration = false;
+    }
+
+    _imgui.updateApplicationCursor(*this);
+
+    GL::Renderer::enable(GL::Renderer::Feature::Blending);
+    GL::Renderer::enable(GL::Renderer::Feature::ScissorTest);
+    GL::Renderer::disable(GL::Renderer::Feature::FaceCulling);
+    GL::Renderer::disable(GL::Renderer::Feature::DepthTest);
+
+    _imgui.drawFrame();
+
+    GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
+    GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
+    GL::Renderer::disable(GL::Renderer::Feature::ScissorTest);
+    GL::Renderer::disable(GL::Renderer::Feature::Blending);
+
+
     swapBuffers();
 
     //if(camChanged) redraw();
@@ -196,16 +286,19 @@ void MainApplication::keyPressEvent(KeyEvent& event) {
 }
 
 void MainApplication::mousePressEvent(MouseEvent& event) {
+    _imgui.handleMousePressEvent(event);
     _arcballCamera->initTransformation(event.position());
 
     event.setAccepted();
     redraw(); /* camera has changed, redraw! */
 }
 
-void MainApplication::mouseReleaseEvent(MouseEvent&) {
+void MainApplication::mouseReleaseEvent(MouseEvent& event) {
+    _imgui.handleMouseReleaseEvent(event);
 }
 
 void MainApplication::mouseMoveEvent(MouseMoveEvent& event) {
+    _imgui.handleMouseMoveEvent(event);
     if(!event.buttons()) return;
 
     if(event.modifiers() & MouseMoveEvent::Modifier::Shift)

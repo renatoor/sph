@@ -6,12 +6,16 @@ namespace Magnum {
 
 float maxTemp = 0.0f;
 
-Color3 SPH::temperatureToColor(float temp, float min, float max) {
+Color3 SPH::floatToColor(float temp, float min, float max) {
     float val = max - min;
     float temp0 = temp - min;
     float deg = (temp0 / val) * 360.0f;
 
     return Color3::fromHsv(ColorHsv(Deg(deg), 0.7f, 0.5f));
+}
+
+Color3 SPH::positionToColor(Vector3 vec) {
+    return Color3 { vec[0], vec[1], vec[2] };
 }
 
 SPH::SPH(Float particleRadius, size_t n) :
@@ -153,6 +157,13 @@ void SPH::integrate(Float timestep)
         //_particleVertex[i].position = position;
 
         _temperatures[i] += _dTemp[i];// * timestep;
+
+        _minTemp = std::min(_minTemp, _temperatures[i]);
+        _maxTemp = std::max(_maxTemp, _temperatures[i]);
+
+        _minDensity = std::min(_minDensity, _temperatures[i]);
+        _maxDensity = std::max(_maxDensity, _temperatures[i]);
+
         //std::cout << "temp[" << i << "] "; std::cout << _temperatures[i] << std::endl;
         //_temperatures[i] += (prevTemp + newTemp) / 2.0 * timestep;
 
@@ -222,7 +233,20 @@ void SPH::checkCollisions(size_t i)
     }
     */
 
-    _particleVertex[i].color = temperatureToColor(_temperatures[i], 00.0f, 40.0f);
+    float velLength = velocity.length();
+    float accLength = _accelerations[i].length();
+
+    _minVel = std::min(velLength, _minVel);
+    _maxVel = std::max(velLength, _maxVel);
+
+    _minAcc = std::min(velLength, _minAcc);
+    _maxAcc = std::max(velLength, _maxAcc);
+
+    if (_showDensity) _particleVertex[i].color = floatToColor(_densities[i], _minDensity, _maxDensity);
+    if (_showTemperature) _particleVertex[i].color = floatToColor(_temperatures[i], _minTemp, _maxTemp);
+    if (_showAcceleration) _particleVertex[i].color = floatToColor(accLength, _minAcc, _maxAcc);
+    if (_showVelocity) _particleVertex[i].color = floatToColor(velLength, _minVel, _maxVel);
+    if (_showPosition) _particleVertex[i].color = positionToColor(_particleVertex[i].position);
     _velocities[i] = velocity;
 }
 
@@ -232,6 +256,51 @@ void SPH::step(Float timestep)
     computeDensities();
     computeForces();
     integrate(timestep);
+}
+
+void SPH::showTemperature()
+{
+    _showTemperature = true;
+    _showDensity = false;
+    _showVelocity = false;
+    _showAcceleration = false;
+    _showPosition = false;
+}
+
+void SPH::showDensity()
+{
+    _showTemperature = false;
+    _showDensity = true;
+    _showVelocity = false;
+    _showAcceleration = false;
+    _showPosition = false;
+}
+
+void SPH::showVelocity()
+{
+    _showTemperature = false;
+    _showDensity = false;
+    _showVelocity = true;
+    _showAcceleration = false;
+    _showPosition = false;
+}
+
+void SPH::showAcceleration()
+{
+    _showTemperature = false;
+    _showDensity = false;
+    _showVelocity = false;
+    _showAcceleration = true;
+    _showPosition = false;
+}
+
+void SPH::showPosition()
+{
+    _showTemperature = false;
+    _showDensity = false;
+    _showVelocity = false;
+    _showAcceleration = false;
+    _showPosition = true;
 }
 
 }
